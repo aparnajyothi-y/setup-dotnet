@@ -1,16 +1,7 @@
 name: e2e tests
 
 on:
-  pull_request:
-    paths-ignore:
-      - '**.md'
-  push:
-    branches:
-      - main
-      - releases/*
-    paths-ignore:
-      - '**.md'
-
+  workflow_dispatch:
 jobs:
   test-setup-multiple-versions:
     runs-on: ${{ matrix.operating-system }}
