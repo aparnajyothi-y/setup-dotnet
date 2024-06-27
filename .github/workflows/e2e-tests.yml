@@ -390,9 +390,9 @@ jobs:
           if (-not ($version -eq '${{steps.step2.outputs.dotnet-version}}')) { throw "Unexpected output value" }
 
   test-proxy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
-      image: ubuntu-20.04
+      image: ubuntu-latest
       options: --dns 127.0.0.1
     services:
       squid-proxy:
@@ -414,7 +414,7 @@ jobs:
           rm packages-microsoft-prod.deb
           apt-get update
           add-apt-repository universe
-          apt-get install -y powershell
+          sudo apt-get install -y powershell
 
       - name: Clear toolcache
         shell: pwsh
