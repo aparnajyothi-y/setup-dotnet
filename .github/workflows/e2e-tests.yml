@@ -392,11 +392,11 @@ jobs:
   test-proxy:
     runs-on: ubuntu-latest
     container:
-      image: ubuntu-latest
+      image: ubuntu:latest
       options: --dns 127.0.0.1
     services:
       squid-proxy:
-        image: ubuntu:latest
+        image: ubuntu/squid:latest
         ports:
           - 3128:3128
     env:
