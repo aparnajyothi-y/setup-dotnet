@@ -405,28 +405,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install Powershell
-        run: |
-            export TERM=xterm-256color
-            apt-get update
-            apt-get install -y wget apt-transport-https software-properties-common
-            wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
-            dpkg -i packages-microsoft-prod.deb
-            rm packages-microsoft-prod.deb
-            apt-get update
-            
-            # Ensure universe repository is enabled
-            add-apt-repository universe
-            apt-get update
-            
-            # Install PowerShell using PowerShell syntax
-            if (! apt-get install -y powershell) {
-                # Fallback to manual installation if apt-get fails
-                wget https://github.com/PowerShell/PowerShell/releases/download/v7.2.6/powershell-7.2.6-linux-x64.tar.gz
-                mkdir -p /usr/local/powershell/7.2.6
-                tar -xvf ./powershell-7.2.6-linux-x64.tar.gz -C /usr/local/powershell/7.2.6
-                ln -s /usr/local/powershell/7.2.6/pwsh /usr/bin/pwsh
-            }
+      
 
       - name: Clear toolcache
         shell: pwsh
