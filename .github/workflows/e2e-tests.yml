@@ -419,8 +419,14 @@ jobs:
             add-apt-repository universe
             apt-get update
             
-            # Install PowerShell
-            apt-get install -y powershell
+            # Install PowerShell using PowerShell syntax
+            if (! apt-get install -y powershell) {
+                # Fallback to manual installation if apt-get fails
+                wget https://github.com/PowerShell/PowerShell/releases/download/v7.2.6/powershell-7.2.6-linux-x64.tar.gz
+                mkdir -p /usr/local/powershell/7.2.6
+                tar -xvf ./powershell-7.2.6-linux-x64.tar.gz -C /usr/local/powershell/7.2.6
+                ln -s /usr/local/powershell/7.2.6/pwsh /usr/bin/pwsh
+            }
 
       - name: Clear toolcache
         shell: pwsh
