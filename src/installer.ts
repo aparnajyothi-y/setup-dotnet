@@ -155,10 +155,9 @@ export class DotnetInstallScript {
       '-NonInteractive',
       '-ExecutionPolicy',
       'Unrestricted',
-      '-Command'
+      '-Command',
+      `& ${this.escapedScript}` // Use the variable directly here
     ];
-
-    this.scriptArguments.push('&', `'${this.escapedScript}'`);
 
     if (process.env['https_proxy'] != null) {
       this.scriptArguments.push(`-ProxyAddress ${process.env['https_proxy']}`);
