@@ -423,7 +423,7 @@ get_normalized_architecture_for_specific_sdk_version() {
 # args:
 # version or channel - $1
 is_arm64_supported() {
-    #any channel or version that starts with the specified versions
+    # any channel or version that starts with the specified versions
     case "$1" in
         ( "1"* | "2"* | "3"*  | "4"* | "5"*) 
             echo false
@@ -433,7 +433,6 @@ is_arm64_supported() {
     echo true
     return 0
 }
-
 # args:
 # user_defined_os - $1
 get_normalized_os() {

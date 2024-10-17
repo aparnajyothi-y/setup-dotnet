@@ -154,14 +154,17 @@ export class DotnetInstallScript {
       '-Command'
     ];
 
-    this.scriptArguments.push('&', `'${this.escapedScript}'`);
+    this.scriptArguments.push('&', `"${this.escapedScript}"`);
 
     if (process.env['https_proxy'] != null) {
-      this.scriptArguments.push(`-ProxyAddress ${process.env['https_proxy']}`);
+      this.scriptArguments.push(
+        `-ProxyAddress '${process.env['https_proxy']}'`
+      );
     }
-    // This is not currently an option
     if (process.env['no_proxy'] != null) {
-      this.scriptArguments.push(`-ProxyBypassList ${process.env['no_proxy']}`);
+      this.scriptArguments.push(
+        `-ProxyBypassList '${process.env['no_proxy']}'`
+      );
     }
   }
 
