@@ -18,6 +18,7 @@ export interface DotnetVersion {
 
 const QUALITY_INPUT_MINIMAL_MAJOR_TAG = 6;
 const LATEST_PATCH_SYNTAX_MINIMAL_MAJOR_TAG = 5;
+
 export class DotnetVersionResolver {
   private inputVersion: string;
   private resolvedArgument: DotnetVersion;
@@ -40,7 +41,7 @@ export class DotnetVersionResolver {
     }
   }
 
-  private isNumericTag(versionTag): boolean {
+  private isNumericTag(versionTag: string): boolean {
     return /^\d+$/.test(versionTag);
   }
 
@@ -204,7 +205,7 @@ export class DotnetInstallScript {
   public async execute() {
     const getExecOutputOptions = {
       ignoreReturnCode: true,
-      env: process.env as {string: string}
+      env: process.env as {[key: string]: string}
     };
 
     return exec.getExecOutput(
@@ -262,10 +263,7 @@ export class DotnetCoreInstaller {
     const versionResolver = new DotnetVersionResolver(this.version);
     const dotnetVersion = await versionResolver.createDotnetVersion();
 
-    /**
-     * Install dotnet runitme first in order to get
-     * the latest stable version of dotnet CLI
-     */
+    // Install dotnet runtime first to make sure the path is set
     const runtimeInstallOutput = await new DotnetInstallScript()
       // If dotnet CLI is already installed - avoid overwriting it
       .useArguments(
@@ -278,19 +276,12 @@ export class DotnetCoreInstaller {
       .execute();
 
     if (runtimeInstallOutput.exitCode) {
-      /**
-       * dotnetInstallScript will install CLI and runtime even if previous script haven't succeded,
-       * so at this point it's too early to throw an error
-       */
       core.warning(
         `Failed to install dotnet runtime + cli, exit code: ${runtimeInstallOutput.exitCode}. ${runtimeInstallOutput.stderr}`
       );
     }
 
-    /**
-     * Install dotnet over the latest version of
-     * dotnet CLI
-     */
+    // Install dotnet over the latest version of dotnet CLI
     const dotnetInstallOutput = await new DotnetInstallScript()
       // Don't overwrite CLI because it should be already installed
       .useArguments(
@@ -319,4 +310,24 @@ export class DotnetCoreInstaller {
     }
     return matchedResult.groups!.version;
   }
+
+  // New method to run dotnet publish
+  public async runDotnetPublish(projectFile: string, outputDir: string) {
+    const quotedOutputDir = quotePathIfNeeded(outputDir);
+    const command = `dotnet publish ${projectFile} -c Release -o ${quotedOutputDir}`;
+
+    const result = await exec.getExecOutput(command, [], {
+      ignoreReturnCode: true,
+      env: process.env as {[key: string]: string}
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to publish project: ${result.stderr}`);
+    }
+  }
+}
+
+// Utility function to wrap paths containing spaces in quotes
+function quotePathIfNeeded(filePath: string): string {
+  return filePath.includes(' ') ? `"${filePath}"` : filePath;
 }

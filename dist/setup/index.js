@@ -93925,10 +93925,7 @@ class DotnetCoreInstaller {
         return __awaiter(this, void 0, void 0, function* () {
             const versionResolver = new DotnetVersionResolver(this.version);
             const dotnetVersion = yield versionResolver.createDotnetVersion();
-            /**
-             * Install dotnet runitme first in order to get
-             * the latest stable version of dotnet CLI
-             */
+            // Install dotnet runtime first to make sure the path is set
             const runtimeInstallOutput = yield new DotnetInstallScript()
                 // If dotnet CLI is already installed - avoid overwriting it
                 .useArguments(utils_1.IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files')
@@ -93938,16 +93935,9 @@ class DotnetCoreInstaller {
                 .useArguments(utils_1.IS_WINDOWS ? '-Channel' : '--channel', 'LTS')
                 .execute();
             if (runtimeInstallOutput.exitCode) {
-                /**
-                 * dotnetInstallScript will install CLI and runtime even if previous script haven't succeded,
-                 * so at this point it's too early to throw an error
-                 */
                 core.warning(`Failed to install dotnet runtime + cli, exit code: ${runtimeInstallOutput.exitCode}. ${runtimeInstallOutput.stderr}`);
             }
-            /**
-             * Install dotnet over the latest version of
-             * dotnet CLI
-             */
+            // Install dotnet over the latest version of dotnet CLI
             const dotnetInstallOutput = yield new DotnetInstallScript()
                 // Don't overwrite CLI because it should be already installed
                 .useArguments(utils_1.IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files')
@@ -93969,11 +93959,29 @@ class DotnetCoreInstaller {
         }
         return matchedResult.groups.version;
     }
+    // New method to run dotnet publish
+    runDotnetPublish(projectFile, outputDir) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const quotedOutputDir = quotePathIfNeeded(outputDir);
+            const command = `dotnet publish ${projectFile} -c Release -o ${quotedOutputDir}`;
+            const result = yield exec.getExecOutput(command, [], {
+                ignoreReturnCode: true,
+                env: process.env
+            });
+            if (result.exitCode !== 0) {
+                throw new Error(`Failed to publish project: ${result.stderr}`);
+            }
+        });
+    }
 }
 exports.DotnetCoreInstaller = DotnetCoreInstaller;
 (() => {
     DotnetInstallDir.setEnvironmentVariable();
 })();
+// Utility function to wrap paths containing spaces in quotes
+function quotePathIfNeeded(filePath) {
+    return filePath.includes(' ') ? `"${filePath}"` : filePath;
+}
 
 
 /***/ }),
