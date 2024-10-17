@@ -181,7 +181,9 @@ export class DotnetInstallScript {
   }
 
   public useArguments(...args: string[]) {
-    this.scriptArguments.push(...args);
+    // Quote arguments that may contain spaces
+    const quotedArgs = args.map(arg => (arg.includes(' ') ? `"${arg}"` : arg));
+    this.scriptArguments.push(...quotedArgs);
     return this;
   }
 
