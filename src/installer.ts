@@ -1,3 +1,4 @@
+// Load tempDirectory before it gets wiped by tool-cache
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as io from '@actions/io';
@@ -17,7 +18,6 @@ export interface DotnetVersion {
 
 const QUALITY_INPUT_MINIMAL_MAJOR_TAG = 6;
 const LATEST_PATCH_SYNTAX_MINIMAL_MAJOR_TAG = 5;
-
 export class DotnetVersionResolver {
   private inputVersion: string;
   private resolvedArgument: DotnetVersion;
@@ -56,7 +56,7 @@ export class DotnetVersionResolver {
         `The 'dotnet-version' was supplied in invalid format: ${this.inputVersion}! The A.B.Cxx syntax is available since the .NET 5.0 release.`
       );
     }
-    return Boolean(majorTag);
+    return majorTag ? true : false;
   }
 
   private createVersionArgument() {
@@ -74,10 +74,11 @@ export class DotnetVersionResolver {
     } else if (this.isNumericTag(major)) {
       this.resolvedArgument.value = await this.getLatestByMajorTag(major);
     } else {
+      // If "dotnet-version" is specified as *, x or X resolve latest version of .NET explicitly from LTS channel. The version argument will default to "latest" by install-dotnet script.
       this.resolvedArgument.value = 'LTS';
     }
     this.resolvedArgument.qualityFlag =
-      parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG;
+      parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG ? true : false;
   }
 
   public async createDotnetVersion(): Promise<DotnetVersion> {
@@ -85,13 +86,13 @@ export class DotnetVersionResolver {
     if (!this.resolvedArgument.type) {
       return this.resolvedArgument;
     }
-    this.resolvedArgument.type = IS_WINDOWS
-      ? this.resolvedArgument.type === 'channel'
-        ? '-Channel'
-        : '-Version'
-      : this.resolvedArgument.type === 'channel'
-        ? '--channel'
-        : '--version';
+    if (IS_WINDOWS) {
+      this.resolvedArgument.type =
+        this.resolvedArgument.type === 'channel' ? '-Channel' : '-Version';
+    } else {
+      this.resolvedArgument.type =
+        this.resolvedArgument.type === 'channel' ? '--channel' : '--version';
+    }
     return this.resolvedArgument;
   }
 
@@ -124,20 +125,15 @@ export class DotnetVersionResolver {
     'https://dotnetcli.azureedge.net/dotnet/release-metadata/releases-index.json';
 }
 
-// Utility function to wrap paths containing spaces in quotes
-function quotePathIfNeeded(filePath: string): string {
-  return filePath.includes(' ') ? `"${filePath}"` : filePath;
-}
-
 export class DotnetInstallScript {
   private scriptName = IS_WINDOWS ? 'install-dotnet.ps1' : 'install-dotnet.sh';
   private escapedScript: string;
   private scriptArguments: string[] = [];
 
   constructor() {
-    this.escapedScript = quotePathIfNeeded(
-      path.join(__dirname, '..', '..', 'externals', this.scriptName)
-    ).replace(/'/g, "''");
+    this.escapedScript = path
+      .join(__dirname, '..', '..', 'externals', this.scriptName)
+      .replace(/'/g, "''");
 
     if (IS_WINDOWS) {
       this.setupScriptPowershell();
@@ -155,13 +151,15 @@ export class DotnetInstallScript {
       '-NonInteractive',
       '-ExecutionPolicy',
       'Unrestricted',
-      '-Command',
-      `& ${this.escapedScript}` // Use the variable directly here
+      '-Command'
     ];
+
+    this.scriptArguments.push('&', `'${this.escapedScript}'`);
 
     if (process.env['https_proxy'] != null) {
       this.scriptArguments.push(`-ProxyAddress ${process.env['https_proxy']}`);
     }
+    // This is not currently an option
     if (process.env['no_proxy'] != null) {
       this.scriptArguments.push(`-ProxyBypassList ${process.env['no_proxy']}`);
     }
@@ -206,11 +204,11 @@ export class DotnetInstallScript {
   public async execute() {
     const getExecOutputOptions = {
       ignoreReturnCode: true,
-      env: process.env as {[key: string]: string}
+      env: process.env as {string: string}
     };
 
     return exec.getExecOutput(
-      `${await this.getScriptPath()}`,
+      `"${await this.getScriptPath()}"`,
       this.scriptArguments,
       getExecOutputOptions
     );
@@ -220,8 +218,8 @@ export class DotnetInstallScript {
 export abstract class DotnetInstallDir {
   private static readonly default = {
     linux: '/usr/share/dotnet',
-    mac: path.join(process.env['HOME'] || '', '.dotnet'),
-    windows: path.join(process.env['PROGRAMFILES'] || '', 'dotnet')
+    mac: path.join(process.env['HOME'] + '', '.dotnet'),
+    windows: path.join(process.env['PROGRAMFILES'] + '', 'dotnet')
   };
 
   public static readonly dirPath = process.env['DOTNET_INSTALL_DIR']
@@ -264,19 +262,61 @@ export class DotnetCoreInstaller {
     const versionResolver = new DotnetVersionResolver(this.version);
     const dotnetVersion = await versionResolver.createDotnetVersion();
 
-    // Install dotnet runtime first to make sure the path is set
-    const installScript = new DotnetInstallScript().useVersion(
-      dotnetVersion,
-      this.quality
-    );
-    const installResult = await installScript.execute();
+    /**
+     * Install dotnet runitme first in order to get
+     * the latest stable version of dotnet CLI
+     */
+    const runtimeInstallOutput = await new DotnetInstallScript()
+      // If dotnet CLI is already installed - avoid overwriting it
+      .useArguments(
+        IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files'
+      )
+      // Install only runtime + CLI
+      .useArguments(IS_WINDOWS ? '-Runtime' : '--runtime', 'dotnet')
+      // Use latest stable version
+      .useArguments(IS_WINDOWS ? '-Channel' : '--channel', 'LTS')
+      .execute();
 
-    if (installResult.exitCode !== 0) {
-      throw new Error(`Failed to install .NET SDK: ${installResult.stderr}`);
+    if (runtimeInstallOutput.exitCode) {
+      /**
+       * dotnetInstallScript will install CLI and runtime even if previous script haven't succeded,
+       * so at this point it's too early to throw an error
+       */
+      core.warning(
+        `Failed to install dotnet runtime + cli, exit code: ${runtimeInstallOutput.exitCode}. ${runtimeInstallOutput.stderr}`
+      );
     }
 
-    return dotnetVersion.value;
+    /**
+     * Install dotnet over the latest version of
+     * dotnet CLI
+     */
+    const dotnetInstallOutput = await new DotnetInstallScript()
+      // Don't overwrite CLI because it should be already installed
+      .useArguments(
+        IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files'
+      )
+      // Use version provided by user
+      .useVersion(dotnetVersion, this.quality)
+      .execute();
+
+    if (dotnetInstallOutput.exitCode) {
+      throw new Error(
+        `Failed to install dotnet, exit code: ${dotnetInstallOutput.exitCode}. ${dotnetInstallOutput.stderr}`
+      );
+    }
+
+    return this.parseInstalledVersion(dotnetInstallOutput.stdout);
+  }
+
+  private parseInstalledVersion(stdout: string): string | null {
+    const regex = /(?<version>\d+\.\d+\.\d+[a-z0-9._-]*)/gm;
+    const matchedResult = regex.exec(stdout);
+
+    if (!matchedResult) {
+      core.warning(`Failed to parse installed by the script version of .NET`);
+      return null;
+    }
+    return matchedResult.groups!.version;
   }
 }
-
-// Other classes follow...
