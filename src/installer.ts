@@ -41,7 +41,7 @@ export class DotnetVersionResolver {
     }
   }
 
-  private isNumericTag(versionTag: string): boolean {
+  private isNumericTag(versionTag): boolean {
     return /^\d+$/.test(versionTag);
   }
 
@@ -75,11 +75,10 @@ export class DotnetVersionResolver {
     } else if (this.isNumericTag(major)) {
       this.resolvedArgument.value = await this.getLatestByMajorTag(major);
     } else {
-      // If "dotnet-version" is specified as *, x or X resolve latest version of .NET explicitly from LTS channel. The version argument will default to "latest" by install-dotnet script.
       this.resolvedArgument.value = 'LTS';
     }
     this.resolvedArgument.qualityFlag =
-      parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG ? true : false;
+      parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG;
   }
 
   public async createDotnetVersion(): Promise<DotnetVersion> {
@@ -87,13 +86,13 @@ export class DotnetVersionResolver {
     if (!this.resolvedArgument.type) {
       return this.resolvedArgument;
     }
-    if (IS_WINDOWS) {
-      this.resolvedArgument.type =
-        this.resolvedArgument.type === 'channel' ? '-Channel' : '-Version';
-    } else {
-      this.resolvedArgument.type =
-        this.resolvedArgument.type === 'channel' ? '--channel' : '--version';
-    }
+    this.resolvedArgument.type = IS_WINDOWS
+      ? this.resolvedArgument.type === 'channel'
+        ? '-Channel'
+        : '-Version'
+      : this.resolvedArgument.type === 'channel'
+        ? '--channel'
+        : '--version';
     return this.resolvedArgument;
   }
 
@@ -160,7 +159,6 @@ export class DotnetInstallScript {
     if (process.env['https_proxy'] != null) {
       this.scriptArguments.push(`-ProxyAddress ${process.env['https_proxy']}`);
     }
-    // This is not currently an option
     if (process.env['no_proxy'] != null) {
       this.scriptArguments.push(`-ProxyBypassList ${process.env['no_proxy']}`);
     }
@@ -205,7 +203,7 @@ export class DotnetInstallScript {
   public async execute() {
     const getExecOutputOptions = {
       ignoreReturnCode: true,
-      env: process.env as {[key: string]: string}
+      env: process.env as {string: string}
     };
 
     return exec.getExecOutput(
@@ -263,15 +261,11 @@ export class DotnetCoreInstaller {
     const versionResolver = new DotnetVersionResolver(this.version);
     const dotnetVersion = await versionResolver.createDotnetVersion();
 
-    // Install dotnet runtime first to make sure the path is set
     const runtimeInstallOutput = await new DotnetInstallScript()
-      // If dotnet CLI is already installed - avoid overwriting it
       .useArguments(
         IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files'
       )
-      // Install only runtime + CLI
       .useArguments(IS_WINDOWS ? '-Runtime' : '--runtime', 'dotnet')
-      // Use latest stable version
       .useArguments(IS_WINDOWS ? '-Channel' : '--channel', 'LTS')
       .execute();
 
@@ -281,13 +275,10 @@ export class DotnetCoreInstaller {
       );
     }
 
-    // Install dotnet over the latest version of dotnet CLI
     const dotnetInstallOutput = await new DotnetInstallScript()
-      // Don't overwrite CLI because it should be already installed
       .useArguments(
         IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files'
       )
-      // Use version provided by user
       .useVersion(dotnetVersion, this.quality)
       .execute();
 
@@ -311,7 +302,6 @@ export class DotnetCoreInstaller {
     return matchedResult.groups!.version;
   }
 
-  // New method to run dotnet publish
   public async runDotnetPublish(projectFile: string, outputDir: string) {
     const quotedOutputDir = quotePathIfNeeded(outputDir);
     const command = `dotnet publish ${projectFile} -c Release -o ${quotedOutputDir}`;
@@ -327,7 +317,7 @@ export class DotnetCoreInstaller {
   }
 }
 
-// Utility function to wrap paths containing spaces in quotes
+// Utility function to wrap paths in quotes
 function quotePathIfNeeded(filePath: string): string {
-  return filePath.includes(' ') ? `"${filePath}"` : filePath;
+  return `"${filePath}"`; // Always wrap the path in quotes
 }

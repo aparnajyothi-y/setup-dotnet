@@ -93773,11 +93773,10 @@ class DotnetVersionResolver {
                 this.resolvedArgument.value = yield this.getLatestByMajorTag(major);
             }
             else {
-                // If "dotnet-version" is specified as *, x or X resolve latest version of .NET explicitly from LTS channel. The version argument will default to "latest" by install-dotnet script.
                 this.resolvedArgument.value = 'LTS';
             }
             this.resolvedArgument.qualityFlag =
-                parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG ? true : false;
+                parseInt(major) >= QUALITY_INPUT_MINIMAL_MAJOR_TAG;
         });
     }
     createDotnetVersion() {
@@ -93786,14 +93785,13 @@ class DotnetVersionResolver {
             if (!this.resolvedArgument.type) {
                 return this.resolvedArgument;
             }
-            if (utils_1.IS_WINDOWS) {
-                this.resolvedArgument.type =
-                    this.resolvedArgument.type === 'channel' ? '-Channel' : '-Version';
-            }
-            else {
-                this.resolvedArgument.type =
-                    this.resolvedArgument.type === 'channel' ? '--channel' : '--version';
-            }
+            this.resolvedArgument.type = utils_1.IS_WINDOWS
+                ? this.resolvedArgument.type === 'channel'
+                    ? '-Channel'
+                    : '-Version'
+                : this.resolvedArgument.type === 'channel'
+                    ? '--channel'
+                    : '--version';
             return this.resolvedArgument;
         });
     }
@@ -93846,7 +93844,6 @@ class DotnetInstallScript {
         if (process.env['https_proxy'] != null) {
             this.scriptArguments.push(`-ProxyAddress ${process.env['https_proxy']}`);
         }
-        // This is not currently an option
         if (process.env['no_proxy'] != null) {
             this.scriptArguments.push(`-ProxyBypassList ${process.env['no_proxy']}`);
         }
@@ -93925,23 +93922,16 @@ class DotnetCoreInstaller {
         return __awaiter(this, void 0, void 0, function* () {
             const versionResolver = new DotnetVersionResolver(this.version);
             const dotnetVersion = yield versionResolver.createDotnetVersion();
-            // Install dotnet runtime first to make sure the path is set
             const runtimeInstallOutput = yield new DotnetInstallScript()
-                // If dotnet CLI is already installed - avoid overwriting it
                 .useArguments(utils_1.IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files')
-                // Install only runtime + CLI
                 .useArguments(utils_1.IS_WINDOWS ? '-Runtime' : '--runtime', 'dotnet')
-                // Use latest stable version
                 .useArguments(utils_1.IS_WINDOWS ? '-Channel' : '--channel', 'LTS')
                 .execute();
             if (runtimeInstallOutput.exitCode) {
                 core.warning(`Failed to install dotnet runtime + cli, exit code: ${runtimeInstallOutput.exitCode}. ${runtimeInstallOutput.stderr}`);
             }
-            // Install dotnet over the latest version of dotnet CLI
             const dotnetInstallOutput = yield new DotnetInstallScript()
-                // Don't overwrite CLI because it should be already installed
                 .useArguments(utils_1.IS_WINDOWS ? '-SkipNonVersionedFiles' : '--skip-non-versioned-files')
-                // Use version provided by user
                 .useVersion(dotnetVersion, this.quality)
                 .execute();
             if (dotnetInstallOutput.exitCode) {
@@ -93959,7 +93949,6 @@ class DotnetCoreInstaller {
         }
         return matchedResult.groups.version;
     }
-    // New method to run dotnet publish
     runDotnetPublish(projectFile, outputDir) {
         return __awaiter(this, void 0, void 0, function* () {
             const quotedOutputDir = quotePathIfNeeded(outputDir);
@@ -93978,9 +93967,9 @@ exports.DotnetCoreInstaller = DotnetCoreInstaller;
 (() => {
     DotnetInstallDir.setEnvironmentVariable();
 })();
-// Utility function to wrap paths containing spaces in quotes
+// Utility function to wrap paths in quotes
 function quotePathIfNeeded(filePath) {
-    return filePath.includes(' ') ? `"${filePath}"` : filePath;
+    return `"${filePath}"`; // Always wrap the path in quotes
 }
 
 
