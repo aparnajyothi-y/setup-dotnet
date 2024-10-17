@@ -93753,7 +93753,7 @@ class DotnetVersionResolver {
             parseInt(majorTag) < LATEST_PATCH_SYNTAX_MINIMAL_MAJOR_TAG) {
             throw new Error(`The 'dotnet-version' was supplied in invalid format: ${this.inputVersion}! The A.B.Cxx syntax is available since the .NET 5.0 release.`);
         }
-        return majorTag ? true : false;
+        return !!majorTag;
     }
     createVersionArgument() {
         this.resolvedArgument.type = 'version';
@@ -93952,7 +93952,8 @@ class DotnetCoreInstaller {
     runDotnetPublish(projectFile, outputDir) {
         return __awaiter(this, void 0, void 0, function* () {
             const quotedOutputDir = quotePathIfNeeded(outputDir);
-            const command = `dotnet publish ${projectFile} -c Release -o ${quotedOutputDir}`;
+            const quotedProjectFile = quotePathIfNeeded(projectFile);
+            const command = `dotnet publish -c Release -o ${quotedOutputDir} ${quotedProjectFile}`;
             const result = yield exec.getExecOutput(command, [], {
                 ignoreReturnCode: true,
                 env: process.env

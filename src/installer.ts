@@ -57,7 +57,7 @@ export class DotnetVersionResolver {
         `The 'dotnet-version' was supplied in invalid format: ${this.inputVersion}! The A.B.Cxx syntax is available since the .NET 5.0 release.`
       );
     }
-    return majorTag ? true : false;
+    return !!majorTag;
   }
 
   private createVersionArgument() {
@@ -203,7 +203,7 @@ export class DotnetInstallScript {
   public async execute() {
     const getExecOutputOptions = {
       ignoreReturnCode: true,
-      env: process.env as {string: string}
+      env: process.env as {[key: string]: string}
     };
 
     return exec.getExecOutput(
@@ -304,7 +304,8 @@ export class DotnetCoreInstaller {
 
   public async runDotnetPublish(projectFile: string, outputDir: string) {
     const quotedOutputDir = quotePathIfNeeded(outputDir);
-    const command = `dotnet publish ${projectFile} -c Release -o ${quotedOutputDir}`;
+    const quotedProjectFile = quotePathIfNeeded(projectFile);
+    const command = `dotnet publish -c Release -o ${quotedOutputDir} ${quotedProjectFile}`;
 
     const result = await exec.getExecOutput(command, [], {
       ignoreReturnCode: true,
